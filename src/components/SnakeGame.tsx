@@ -13,7 +13,7 @@ type GameAction =
   | { type: 'TICK' }
   | { type: 'CHANGE_DIRECTION'; direction: Direction }
   | { type: 'TOGGLE_PAUSE' }
-  | { type: 'RESTART' };
+  | { type: 'RESTART'; mode: GameMode };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
@@ -24,7 +24,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'TOGGLE_PAUSE':
       return togglePause(state);
     case 'RESTART':
-      return restartGame(state.mode);
+      return restartGame(action.mode);
     default:
       return state;
   }
@@ -37,7 +37,7 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
 
   // Reset game when mode changes
   useEffect(() => {
-    dispatch({ type: 'RESTART' });
+    dispatch({ type: 'RESTART', mode });
     gameOverTriggered.current = false;
   }, [mode]);
 
@@ -122,7 +122,7 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
             variant="outline"
             size="icon"
             onClick={() => {
-              dispatch({ type: 'RESTART' });
+              dispatch({ type: 'RESTART', mode });
               gameOverTriggered.current = false;
             }}
             className="border-accent/50 hover:bg-accent/10"
@@ -173,10 +173,10 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
             <p className="text-xl text-muted-foreground">
               Final Score: <span className="text-primary">{state.score}</span>
             </p>
-            <Button
-              onClick={() => {
-                dispatch({ type: 'RESTART' });
-                gameOverTriggered.current = false;
+          <Button
+            onClick={() => {
+              dispatch({ type: 'RESTART', mode });
+              gameOverTriggered.current = false;
               }}
               className="font-pixel"
             >
