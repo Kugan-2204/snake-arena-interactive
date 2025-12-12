@@ -1,0 +1,302 @@
+openapi: 3.0.0
+info:
+  title: Snake Arena API
+  version: 1.0.0
+  description: API for Snake Arena game backend, derived from frontend mock services.
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+
+paths:
+  /auth/signup:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request (e.g. duplicate email/username)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/me:
+    get:
+      summary: Get current logged in user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  /leaderboard:
+    get:
+      summary: Get leaderboard entries
+      tags: [Leaderboard]
+      parameters:
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [pass-through, walls]
+          description: Filter by game mode
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of entries to return
+      responses:
+        '200':
+          description: List of leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+    post:
+      summary: Submit a new score
+      tags: [Leaderboard]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - score
+                - mode
+              properties:
+                score:
+                  type: integer
+                mode:
+                  type: string
+                  enum: [pass-through, walls]
+      responses:
+        '201':
+          description: Score submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardEntry'
+
+  /games/active:
+    get:
+      summary: Get active players (spectator mode)
+      tags: [Games]
+      responses:
+        '200':
+          description: List of active players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivePlayer'
+
+  /games/active/{playerId}:
+    get:
+      summary: Watch a specific player
+      tags: [Games]
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Player details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivePlayer'
+        '404':
+          description: Player not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        highScore:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+        - highScore
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        score:
+          type: integer
+        mode:
+          type: string
+          enum: [pass-through, walls]
+        date:
+          type: string
+          format: date
+      required:
+        - id
+        - username
+        - score
+        - mode
+        - date
+
+    ActivePlayer:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        score:
+          type: integer
+        mode:
+          type: string
+          enum: [pass-through, walls]
+        snake:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+        food:
+          type: object
+          properties:
+            x:
+              type: integer
+            y:
+              type: integer
+        direction:
+          type: string
+          enum: [up, down, left, right]
+      required:
+        - id
+        - username
+        - score
+        - mode
+        - snake
+        - food
+        - direction
