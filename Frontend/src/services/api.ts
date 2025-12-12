@@ -24,7 +24,8 @@ export interface ActivePlayer {
   direction: 'up' | 'down' | 'left' | 'right';
 }
 
-const API_Base = 'http://localhost:8000';
+// In production (single container), API is relative. In dev, we can use env var or localhost.
+const API_Base = import.meta.env.VITE_API_URL || '';
 
 const getHeaders = (token?: string) => {
   const headers: HeadersInit = {
