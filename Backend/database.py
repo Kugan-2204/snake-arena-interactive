@@ -1,101 +1,62 @@
-from typing import Dict, List, Optional
-from datetime import date, datetime, timedelta
-from models import User, LeaderboardEntry, ActivePlayer, GameMode, Direction, Point
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker
+from sql_models import Base, User, Leaderboard, GameMode
+import os
+from datetime import datetime, date
 
-# Mock Data Store
-class MockDatabase:
-    def __init__(self):
-        self.users: Dict[str, User] = {}
-        # Store passwords separately for simplicity in this mock
-        self.passwords: Dict[str, str] = {}
-        self.leaderboard: List[LeaderboardEntry] = []
-        self._init_data()
+# Default to SQLite, can be overridden by DATABASE_URL env var
+# For SQLite async, use sqlite+aiosqlite:///
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./snake_arena.db")
 
-    def _init_data(self):
-        # Initialize with data matching frontend mock
+engine = create_async_engine(
+    DATABASE_URL, 
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
+async def init_db():
+    async with engine.begin() as conn:
+        # Create tables
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Seed data if empty
+    async with AsyncSessionLocal() as session:
+        # Check if users exist
+        from sqlalchemy import select
+        result = await session.execute(select(User))
+        user = result.scalars().first()
         
-        # 1. Fake Users
-        self._add_user("user-demo", "demo", "demo@example.com", "password", 5000)
-        self._add_user("user-1", "SnakeMaster", "master@snake.com", "pass123", 2450)
-        self._add_user("user-2", "PixelPro", "pixel@game.com", "pass123", 2100)
-        self._add_user("user-3", "NeonNinja", "neon@city.com", "pass123", 1650)
-        
-        # 2. Leaderboard
-        self._add_leaderboard_entry("1", "SnakeMaster", 2450, GameMode.WALLS, "2024-12-10")
-        self._add_leaderboard_entry("2", "PixelPro", 2100, GameMode.PASS_THROUGH, "2024-12-10")
-        self._add_leaderboard_entry("3", "RetroGamer", 1890, GameMode.WALLS, "2024-12-09")
-        self._add_leaderboard_entry("4", "NeonNinja", 1650, GameMode.PASS_THROUGH, "2024-12-09")
-        self._add_leaderboard_entry("5", "ArcadeKing", 1420, GameMode.WALLS, "2024-12-08")
-        self._add_leaderboard_entry("6", "CyberSnake", 1200, GameMode.PASS_THROUGH, "2024-12-08")
-        self._add_leaderboard_entry("7", "BitBiter", 980, GameMode.WALLS, "2024-12-07")
-        self._add_leaderboard_entry("8", "GridRunner", 850, GameMode.PASS_THROUGH, "2024-12-07")
-        self._add_leaderboard_entry("9", "VoidViper", 720, GameMode.WALLS, "2024-12-06")
-        self._add_leaderboard_entry("10", "DigitalDragon", 600, GameMode.PASS_THROUGH, "2024-12-06")
+        if not user:
+            # Seed Users
+            from routers.auth import get_password_hash
+            
+            demo_user = User(id="user-demo", username="demo", email="demo@example.com", password=get_password_hash("password"), high_score=5000)
+            master = User(id="user-1", username="SnakeMaster", email="master@snake.com", password=get_password_hash("pass123"), high_score=2450)
+            pixel = User(id="user-2", username="PixelPro", email="pixel@game.com", password=get_password_hash("pass123"), high_score=2100)
+            
+            session.add_all([demo_user, master, pixel])
+            
+            # Seed Leaderboard
+            entries = [
+                Leaderboard(id="1", username="SnakeMaster", score=2450, mode=GameMode.WALLS, date=date(2024, 12, 10)),
+                Leaderboard(id="2", username="PixelPro", score=2100, mode=GameMode.PASS_THROUGH, date=date(2024, 12, 10)),
+                Leaderboard(id="3", username="RetroGamer", score=1890, mode=GameMode.WALLS, date=date(2024, 12, 9)),
+                Leaderboard(id="4", username="NeonNinja", score=1650, mode=GameMode.PASS_THROUGH, date=date(2024, 12, 9)),
+                Leaderboard(id="5", username="ArcadeKing", score=1420, mode=GameMode.WALLS, date=date(2024, 12, 8)),
+            ]
+            session.add_all(entries)
+            await session.commit()
 
-    def _add_user(self, id: str, username: str, email: str, password: str, high_score: int):
-        user = User(
-            id=id,
-            username=username,
-            email=email,
-            highScore=high_score,
-            createdAt=datetime.now()
-        )
-        self.users[id] = user
-        self.passwords[id] = password
-
-    def _add_leaderboard_entry(self, id: str, username: str, score: int, mode: GameMode, date_str: str):
-        self.leaderboard.append(LeaderboardEntry(
-            id=id,
-            username=username,
-            score=score,
-            mode=mode,
-            date=date.fromisoformat(date_str)
-        ))
-
-    def create_user(self, user: User, password: str):
-        self.users[user.id] = user
-        self.passwords[user.id] = password
-
-    def get_user_by_email(self, email: str) -> Optional[User]:
-        for user in self.users.values():
-            if user.email == email:
-                return user
-        return None
-
-    def get_user_by_username(self, username: str) -> Optional[User]:
-        for user in self.users.values():
-            if user.username == username:
-                return user
-        return None
-
-    def check_password(self, user_id: str, password: str) -> bool:
-        return self.passwords.get(user_id) == password
-
-    def add_score(self, entry: LeaderboardEntry):
-        self.leaderboard.append(entry)
-        self.leaderboard.sort(key=lambda x: x.score, reverse=True)
-
-    def get_active_players(self) -> List[ActivePlayer]:
-        # Return simulated active players
-        return [
-            ActivePlayer(
-                id="player-1",
-                username="SnakeMaster",
-                score=340,
-                mode=GameMode.WALLS,
-                snake=[Point(x=10, y=10), Point(x=9, y=10), Point(x=8, y=10)],
-                food=Point(x=15, y=12),
-                direction=Direction.RIGHT,
-            ),
-             ActivePlayer(
-                id="player-2",
-                username="NeonNinja",
-                score=180,
-                mode=GameMode.PASS_THROUGH,
-                snake=[Point(x=5, y=5), Point(x=5, y=4), Point(x=5, y=3)],
-                food=Point(x=12, y=8),
-                direction=Direction.DOWN,
-            ),
-        ]
-
-db = MockDatabase()
+# Dependency for FastAPI
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

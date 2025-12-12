@@ -1,0 +1,48 @@
+services:
+  frontend:
+    build: ./Frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - snake-net
+
+  backend:
+    build: ./Backend
+    environment:
+      # Use the docker service name 'db' as the hostname
+      - DATABASE_URL=postgresql+asyncpg://snakeuser:snakepass@db/snake_arena
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - snake-net
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=snakeuser
+      - POSTGRES_PASSWORD=snakepass
+      - POSTGRES_DB=snake_arena
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - snake-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U snakeuser -d snake_arena" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+
+networks:
+  snake-net:
