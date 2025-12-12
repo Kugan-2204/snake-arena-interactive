@@ -102,7 +102,7 @@ export const authApi = {
 // Leaderboard API
 export const leaderboardApi = {
   async getLeaderboard(mode?: 'pass-through' | 'walls', limit = 10): Promise<LeaderboardEntry[]> {
-    const url = new URL(`${API_Base}/leaderboard/`);
+    const url = new URL(`${API_Base}/leaderboard/`, window.location.origin);
     if (mode) url.searchParams.append('mode', mode);
     url.searchParams.append('limit', limit.toString());
 
