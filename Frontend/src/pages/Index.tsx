@@ -9,12 +9,12 @@ import { Zap, Shield } from 'lucide-react';
 
 const Index = () => {
   const [mode, setMode] = useState<GameMode>('walls');
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const handleGameOver = async (score: number) => {
-    if (user && score > 0) {
+    if (user && token && score > 0) {
       try {
-        await leaderboardApi.submitScore(user.id, user.username, score, mode);
+        await leaderboardApi.submitScore(token, score, mode);
         toast.success(`Score of ${score} submitted!`);
       } catch (error) {
         toast.error('Failed to submit score');

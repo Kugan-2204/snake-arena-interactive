@@ -3,6 +3,7 @@ import { authApi, User } from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -15,12 +16,14 @@ const TOKEN_KEY = 'snake_auth_token';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      authApi.getCurrentUser(token).then(user => {
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (storedToken) {
+      setToken(storedToken);
+      authApi.getCurrentUser(storedToken).then(user => {
         setUser(user);
         setIsLoading(false);
       });
@@ -35,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: result.error };
     }
     localStorage.setItem(TOKEN_KEY, result.token);
+    setToken(result.token);
     setUser(result.user);
     return { success: true };
   };
@@ -45,21 +49,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: result.error };
     }
     localStorage.setItem(TOKEN_KEY, result.token);
+    setToken(result.token);
     setUser(result.user);
     return { success: true };
   };
 
   const logout = async () => {
-    await authApi.logout();
+    if (token) {
+      await authApi.logout(token);
+    }
     localStorage.removeItem(TOKEN_KEY);
+    setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
+
 }
 
 export function useAuth() {
