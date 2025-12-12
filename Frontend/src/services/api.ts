@@ -135,4 +135,17 @@ export const gamesApi = {
     if (!response.ok) return null;
     return await response.json();
   },
+
+  async updateGameState(token: string, state: Omit<ActivePlayer, 'id' | 'username'>): Promise<void> {
+    try {
+      await fetch(`${API_Base}/games/update`, {
+        method: 'POST',
+        headers: getHeaders(token),
+        body: JSON.stringify(state),
+      });
+    } catch (e) {
+      // Ignore network errors in game loop to avoid lag
+      console.error("Game update failed", e);
+    }
+  }
 };

@@ -2,6 +2,8 @@ import React, { useEffect, useCallback, useReducer, useRef } from 'react';
 import { GameState, GameMode, createInitialState, tick, changeDirection, togglePause, restartGame, Direction, GRID_SIZE } from '@/game/snakeLogic';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { gamesApi } from '@/services/api';
 
 interface SnakeGameProps {
   mode: GameMode;
@@ -9,7 +11,7 @@ interface SnakeGameProps {
   onScoreChange?: (score: number) => void;
 }
 
-type GameAction = 
+type GameAction =
   | { type: 'TICK' }
   | { type: 'CHANGE_DIRECTION'; direction: Direction }
   | { type: 'TOGGLE_PAUSE' }
@@ -65,6 +67,26 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
   useEffect(() => {
     onScoreChange?.(state.score);
   }, [state.score, onScoreChange]);
+
+  // Sync state with server for spectator mode
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    if (!user || !token || state.gameOver) return;
+
+    // Throttle updates to every 500ms
+    const syncInterval = setInterval(() => {
+      gamesApi.updateGameState(token, {
+        score: state.score,
+        mode: mode,
+        snake: state.snake,
+        food: state.food,
+        direction: state.direction
+      });
+    }, 500);
+
+    return () => clearInterval(syncInterval);
+  }, [user, token, state.snake, state.score, state.food, state.direction, state.gameOver, mode]);
 
   // Keyboard controls
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -138,11 +160,10 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
         {state.snake.map((segment, index) => (
           <div
             key={`${segment.x}-${segment.y}-${index}`}
-            className={`absolute rounded-sm transition-all duration-75 ${
-              index === 0 
-                ? 'bg-primary box-glow z-10' 
-                : 'bg-primary/80'
-            }`}
+            className={`absolute rounded-sm transition-all duration-75 ${index === 0
+              ? 'bg-primary box-glow z-10'
+              : 'bg-primary/80'
+              }`}
             style={{
               left: `${segment.x * cellSize}%`,
               top: `${segment.y * cellSize}%`,
@@ -173,10 +194,10 @@ export function SnakeGame({ mode, onGameOver, onScoreChange }: SnakeGameProps) {
             <p className="text-xl text-muted-foreground">
               Final Score: <span className="text-primary">{state.score}</span>
             </p>
-          <Button
-            onClick={() => {
-              dispatch({ type: 'RESTART', mode });
-              gameOverTriggered.current = false;
+            <Button
+              onClick={() => {
+                dispatch({ type: 'RESTART', mode });
+                gameOverTriggered.current = false;
               }}
               className="font-pixel"
             >
